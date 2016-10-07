@@ -189,7 +189,7 @@ static void handle_signal(int sig, siginfo_t *info, void *data) {
 int main(int argc, char *argv[]) {
     /* Keep a symbol pointing to the I3_VERSION string constant so that we have
      * it in gdb backtraces. */
-    const char *_i3_version __attribute__((unused)) = i3_version;
+    static const char *_i3_version __attribute__((used)) = I3_VERSION;
     char *override_configpath = NULL;
     bool autostart = true;
     char *layout_path = NULL;
@@ -451,7 +451,7 @@ int main(int argc, char *argv[]) {
             memset(cwd, '\0', cwd_size);
             if (read(patternfd, cwd, cwd_size) > 0)
                 /* a trailing newline is included in cwd */
-                LOG("CORE DUMPS: Your core_pattern is: \"%s\".\n", cwd);
+                LOG("CORE DUMPS: Your core_pattern is: %s", cwd);
             close(patternfd);
         }
         free(cwd);
@@ -503,10 +503,11 @@ int main(int argc, char *argv[]) {
         visual_type = get_visualtype(root_screen);
     }
 
+    init_dpi();
+
     DLOG("root_depth = %d, visual_id = 0x%08x.\n", root_depth, visual_type->visual_id);
-    DLOG("root_screen->height_in_pixels = %d, root_screen->height_in_millimeters = %d, dpi = %d\n",
-         root_screen->height_in_pixels, root_screen->height_in_millimeters,
-         (int)((double)root_screen->height_in_pixels * 25.4 / (double)root_screen->height_in_millimeters));
+    DLOG("root_screen->height_in_pixels = %d, root_screen->height_in_millimeters = %d\n",
+         root_screen->height_in_pixels, root_screen->height_in_millimeters);
     DLOG("One logical pixel corresponds to %d physical pixels on this display.\n", logical_px(1));
 
     xcb_get_geometry_cookie_t gcookie = xcb_get_geometry(conn, root);
@@ -538,7 +539,11 @@ int main(int argc, char *argv[]) {
 
     xcb_void_cookie_t cookie;
     cookie = xcb_change_window_attributes_checked(conn, root, XCB_CW_EVENT_MASK, (uint32_t[]){ROOT_EVENT_MASK});
-    check_error(conn, cookie, "Another window manager seems to be running");
+    xcb_generic_error_t *error = xcb_request_check(conn, cookie);
+    if (error != NULL) {
+        ELOG("Another window manager seems to be running (X error %d)\n", error->error_code);
+        return 1;
+    }
 
     xcb_get_geometry_reply_t *greply = xcb_get_geometry_reply(conn, gcookie, NULL);
     if (greply == NULL) {
@@ -822,7 +827,7 @@ int main(int argc, char *argv[]) {
                       (uint32_t[]){XCB_GX_COPY, ~0, XCB_FILL_STYLE_SOLID, XCB_SUBWINDOW_MODE_INCLUDE_INFERIORS});
 
         xcb_copy_area(conn, root->root, pixmap, gc, 0, 0, 0, 0, width, height);
-        xcb_change_window_attributes_checked(conn, root->root, XCB_CW_BACK_PIXMAP, (uint32_t[]){pixmap});
+        xcb_change_window_attributes(conn, root->root, XCB_CW_BACK_PIXMAP, (uint32_t[]){pixmap});
         xcb_flush(conn);
         xcb_free_gc(conn, gc);
         xcb_free_pixmap(conn, pixmap);

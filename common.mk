@@ -21,7 +21,7 @@ endif
 # In dist and snapshot tarballs, use the I3_VERSION and VERSION files. Otherwise use git information.
 ifeq ($(wildcard .git),)
   # not in git repository
-  VERSION := '$(shell [ -f $(TOPDIR)/VERSION ] && cat $(TOPDIR)/VERSION)'
+  VERSION := $(shell [ -f $(TOPDIR)/I3_VERSION ] && cat $(TOPDIR)/I3_VERSION | cut -d '-' -f 1)
   I3_VERSION := '$(shell [ -f $(TOPDIR)/I3_VERSION ] && cat $(TOPDIR)/I3_VERSION)'
 else
   VERSION := $(shell git describe --tags --abbrev=0)
@@ -93,15 +93,10 @@ XCB_CFLAGS  := $(call cflags_for_lib, xcb)
 XCB_CFLAGS  += $(call cflags_for_lib, xcb-event)
 XCB_LIBS    := $(call ldflags_for_lib, xcb,xcb)
 XCB_LIBS    += $(call ldflags_for_lib, xcb-event,xcb-event)
-ifeq ($(shell $(PKG_CONFIG) --exists xcb-util 2>/dev/null || echo 1),1)
-XCB_CFLAGS  += $(call cflags_for_lib, xcb-atom)
-XCB_CFLAGS  += $(call cflags_for_lib, xcb-aux)
-XCB_LIBS    += $(call ldflags_for_lib, xcb-atom,xcb-atom)
-XCB_LIBS    += $(call ldflags_for_lib, xcb-aux,xcb-aux)
-XCB_CPPFLAGS+= -DXCB_COMPAT
-else
 XCB_CFLAGS  += $(call cflags_for_lib, xcb-util)
 XCB_LIBS    += $(call ldflags_for_lib, xcb-util)
+ifneq ($(shell $(PKG_CONFIG) --atleast-version=0.3.8 xcb-util 2>/dev/null && echo 1),1)
+$(error "xcb-util >= 0.3.8 not found")
 endif
 XCB_XKB_LIBS := $(call ldflags_for_lib, xcb-xkb,xcb-xkb)
 
@@ -140,8 +135,8 @@ LIBEV_LIBS   := $(call ldflags_for_lib, libev,ev)
 
 # libpcre
 PCRE_CFLAGS := $(call cflags_for_lib, libpcre)
-ifeq ($(shell $(PKG_CONFIG) --atleast-version=8.10 libpcre 2>/dev/null && echo 1),1)
-I3_CPPFLAGS += -DPCRE_HAS_UCP=1
+ifneq ($(shell $(PKG_CONFIG) --atleast-version=8.10 libpcre 2>/dev/null && echo 1),1)
+$(error "libpcre >= 8.10 not found")
 endif
 PCRE_LIBS   := $(call ldflags_for_lib, libpcre,pcre)
 
@@ -152,9 +147,8 @@ LIBSN_LIBS   := $(call ldflags_for_lib, libstartup-notification-1.0,startup-noti
 # Pango
 PANGO_CFLAGS := $(call cflags_for_lib, cairo)
 PANGO_CFLAGS += $(call cflags_for_lib, pangocairo)
-I3_CPPFLAGS  += -DPANGO_SUPPORT=1
-ifeq ($(shell $(PKG_CONFIG) --atleast-version=1.14.4 cairo 2>/dev/null && echo 1),1)
-I3_CPPFLAGS  += -DCAIRO_SUPPORT=1
+ifneq ($(shell $(PKG_CONFIG) --atleast-version=1.14.4 cairo 2>/dev/null && echo 1),1)
+$(error "cairo >= 1.14.4 missing")
 endif
 PANGO_LIBS   := $(call ldflags_for_lib, cairo)
 PANGO_LIBS   += $(call ldflags_for_lib, pangocairo)
